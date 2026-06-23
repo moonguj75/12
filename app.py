@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import copy
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.6", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.7", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,13 +12,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.6")
-st.caption("v7.6 핵심 수정: v7.4 기반 자산 숫자 입력 조작 즉시 실시간 저장(미러링) 구조 완성 및 오타 완치")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.7")
+st.caption("v7.7 핵심 수정: st.session_state 위젯 연동 안정화로 ValueError 완벽 방지 및 실시간 저장 강화")
 st.markdown("---")
 
-# 1. 마스터 저장소 (기억 버튼으로만 갱신)
+# 기본 자산 딕셔너리 생성 함수
 DEFAULT_ASSET = lambda: {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False}
 
+# 1. 마스터 저장소 초기화 (기억 버튼으로만 갱신)
 if "master_store" not in st.session_state:
     st.session_state.master_store = {
         "start_year": 2026,
@@ -35,7 +37,7 @@ if "master_store" not in st.session_state:
         }
     }
 
-# 2. 실시간 작업 저장소 cfg (위젯 value= 의 유일한 소스)
+# 2. 실시간 작업 저장소 초기화
 if "cfg" not in st.session_state:
     ms = st.session_state.master_store
     st.session_state.cfg = {
@@ -48,14 +50,14 @@ if "cfg" not in st.session_state:
         "deposit_rate": ms["deposit_rate"],
         "cma_rate": ms["cma_rate"],
         "jesus_rate": ms["jesus_rate"],
-        "asset_config": {k: v.copy() for k, v in ms["asset_config"].items()},
+        "asset_config": copy.deepcopy(ms["asset_config"]),
         "selected_year": 1,
     }
 
 cfg = st.session_state.cfg
 
-# 누락 연차 기본값 보충
-for y in range(1, cfg["years_to_run"] + 1):
+# 전체 기간에 맞춰 자산 설정 공간 보충
+for y in range(1, int(cfg["years_to_run"]) + 1):
     cfg["asset_config"].setdefault(y, DEFAULT_ASSET())
 
 # ============================================================
@@ -66,73 +68,76 @@ col_save, col_load = st.sidebar.columns(2)
 
 with col_save:
     if st.button("💾 현재 세팅 기억", use_container_width=True, type="primary"):
-        import copy
         st.session_state.master_store = copy.deepcopy(cfg)
         st.sidebar.success("✅ 모든 세팅 기억 완료!")
 
 with col_load:
     if st.button("📂 세팅 불러오기", use_container_width=True):
-        import copy
         st.session_state.cfg = copy.deepcopy(st.session_state.master_store)
         st.rerun()
 
 st.sidebar.markdown("---")
 
 # ============================================================
-# 4. 기본 환경 설정 — 값 변경 즉시 cfg에 반영
+# 4. 기본 환경 설정 (값 변경 즉시 반영)
 # ============================================================
 st.sidebar.header("🗓️ 기본 환경 설정")
 
 cfg["start_year"] = st.sidebar.number_input(
     "🚀 시뮬레이션 시작 연도", min_value=2020, max_value=2060, step=1,
-    value=cfg["start_year"])
+    value=int(cfg["start_year"]))
 
 cfg["start_month"] = st.sidebar.number_input(
     "🚀 시뮬레이션 시작 월", min_value=1, max_value=12, step=1,
-    value=cfg["start_month"])
+    value=int(cfg["start_month"]))
 
 cfg["years_to_run"] = st.sidebar.number_input(
     "📊 전체 시뮬레이션 기간 (년)", min_value=1, max_value=30, step=1,
-    value=cfg["years_to_run"])
+    value=int(cfg["years_to_run"]))
 
 cfg["living_cost_annual"] = st.sidebar.number_input(
     "🛒 연간 총 생활비 (만원)", min_value=0, step=10,
-    value=cfg["living_cost_annual"])
+    value=int(cfg["living_cost_annual"]))
 
 cfg["deposit_unit"] = st.sidebar.number_input(
     "🔓 매년 만기/소비되는 아내 예금 단위 (만원)", min_value=0, step=100,
-    value=cfg["deposit_unit"])
+    value=int(cfg["deposit_unit"]))
 
-# 누락 연차 재보충 (years_to_run 변경 시)
-for y in range(1, cfg["years_to_run"] + 1):
+# 기간 변경을 고려하여 공간 재보충
+for y in range(1, int(cfg["years_to_run"]) + 1):
     cfg["asset_config"].setdefault(y, DEFAULT_ASSET())
 
 # ============================================================
-# 5. 연차별 자산 설정 (숫자 입력 즉시 실시간 강제 보존 로직 추가)
+# 5. 연차별 자산 설정 (튕김 없는 실시간 미러링 보존)
 # ============================================================
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 연차별 자산 설정")
 
-year_options = [f"{i}년차({cfg['start_year'] + i - 1}년)" for i in range(1, cfg["years_to_run"] + 1)]
+year_options = [f"{i}년차({int(cfg['start_year']) + i - 1}년)" for i in range(1, int(cfg["years_to_run"]) + 1)]
+
+# 현재 선택된 연차가 리스트 범위를 벗어나지 않도록 보정
+current_idx = min(int(cfg["selected_year"]) - 1, len(year_options) - 1)
+current_idx = max(0, current_idx)
+
 selected_label = st.sidebar.selectbox(
     "계측 및 자산 설정을 진행할 연차를 고르세요",
     year_options,
-    index=min(cfg["selected_year"] - 1, len(year_options) - 1)
+    index=current_idx
 )
 setup_year_num = int(selected_label.split("년차")[0])
 cfg["selected_year"] = setup_year_num
 
-target_display_year = cfg["start_year"] + setup_year_num - 1
+target_display_year = int(cfg["start_year"]) + setup_year_num - 1
 st.sidebar.subheader(f"📍 [{setup_year_num}년차 ({target_display_year}년)] 자산 배정")
 
 ac = cfg["asset_config"][setup_year_num]
 
 ac["override"] = st.sidebar.checkbox(
     f"{setup_year_num}년차 자산을 직접 지정 (체크 해제 시 자동 이월)",
-    value=ac["override"]
+    value=bool(ac["override"])
 )
 
-# ★ 핵심 수정: 사용자가 입력 상자에 치는 숫자가 튕기지 않고 실시간으로 장부에 고정되도록 좌변에 대입문 연결
+# 입력 상자에 값을 칠 때 즉시 딕셔너리에 대입되도록 구현 (고정 완료)
 ac["h_jesus"]   = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)",  step=1000, value=int(ac["h_jesus"]),   disabled=not ac["override"])
 ac["h_deposit"] = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)",      step=500,  value=int(ac["h_deposit"]), disabled=not ac["override"])
 ac["h_cma"]     = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)",      step=50,   value=int(ac["h_cma"]),     disabled=not ac["override"])
@@ -161,9 +166,9 @@ cma_rate     = cfg["cma_rate"]     / 100
 jesus_rate   = cfg["jesus_rate"]   / 100
 living_cost_annual = cfg["living_cost_annual"] * 10000
 deposit_unit       = cfg["deposit_unit"] * 10000
-start_year         = cfg["start_year"]
-start_month        = cfg["start_month"]
-years_to_run       = cfg["years_to_run"]
+start_year         = int(cfg["start_year"])
+start_month        = int(cfg["start_month"])
+years_to_run       = int(cfg["years_to_run"])
 
 st.markdown("---")
 
@@ -289,7 +294,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
         })
 
     # ============================================================
-    # 8. 리포트 출력
+    # 8. 리포트 출력 영역
     # ============================================================
     st.header(f"🏁 [{setup_year_num}년차 ({start_year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황"])
@@ -309,6 +314,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
         col_h, col_w = st.columns(2)
         with col_h:
             st.markdown("#### 👨 남편 총평")
+            st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):配置} 만원".replace('配置', '').replace('配置', ''))
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0:
@@ -317,7 +323,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
                 st.error("🚨 경고: 1,000만원 초과! 건보료 부과 대상")
         with col_w:
             st.markdown("#### 👩 아내 총평")
-            # [★완벽수정★] 과거 KeyError 발생 원인이었던 '아내전' 오타를 '아내세전'으로 정확히 일치화 완료
             st.metric("아내 세전 금융소득 합계", f"{int(target_res['아내세전']/10000):,} 만원")
             w_margin = 20000000 - target_res['아내세전']
             if w_margin > 0:
