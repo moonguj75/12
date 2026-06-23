@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.8", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.9", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,13 +12,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.8")
-st.caption("v6.8.8 수정사항: 외부 모듈 의존성 제거로 ModuleNotFoundError 완벽 차단 및 데이터 세션 보존 안정화")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.9")
+st.caption("v6.8.9 수정사항: 월별 잔고 보고서의 달력 연산 타이밍 버그 수정 (최종일 2027-06-23 정상 도달 보장)")
 st.markdown("---")
 
-# ----------------------------------------------------------------
-# [★안전 패치★] 외부 모듈 없이 세션 스테이트 자체를 활용한 안정적 기억 장치
-# ----------------------------------------------------------------
+# 세션 스냅샷 초기화
 if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
         "start_date": datetime(2026, 6, 23).date(),
@@ -33,9 +31,7 @@ if "global_snapshot" not in st.session_state:
 
 snapshot = st.session_state.global_snapshot
 
-# ----------------------------------------------------------------
 # 기본 환경 설정
-# ----------------------------------------------------------------
 st.sidebar.header("🗓️ 기본 환경 및 시작일 설정")
 start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일 (년-월-일)", value=snapshot["start_date"])
 years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(snapshot["years_to_run"]), min_value=1, max_value=30, step=1)
@@ -98,7 +94,6 @@ st.markdown("---")
 setup_year_num = int(selected_setup_year.split("년차")[0])
 
 if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 1}년) 장부 집중 가동", type="primary"):
-    # 현재 설정값 메모리에 안전 스냅샷 저장
     st.session_state.global_snapshot = {
         "start_date": start_date, "years_to_run": years_to_run,
         "living_cost_annual": living_cost_annual / 10000, "deposit_unit": deposit_unit / 10000,
@@ -141,6 +136,13 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             if w_cma >= monthly_living_cost: w_cma -= monthly_living_cost
             else: h_cma -= monthly_living_cost
 
+            # [★정밀 타임라인 엔진 교체★] 1달 소비가 끝난 '이후(월말 시점)' 달력 날짜를 먼저 계산
+            m = current_running_date.month + 1
+            y_offset = current_running_date.year
+            if m > 12: m = 1; y_offset += 1
+            current_running_date = datetime(y_offset, m, min(current_running_date.day, 28))
+
+            # 정산이 완료된 실제 날짜 스탬프를 표에 반영 (최종 달이 정확히 2027-06-23에 도달)
             if year == setup_year_num:
                 stamp_text = current_running_date.strftime("%Y년 %m월 %d일")
                 monthly_records.append({
@@ -150,11 +152,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
                     "👩아내 정기예금": int(max(0, w_deposit) / 10000), "👩아내 CMA": int(max(0, w_cma) / 10000),
                     "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_deposit + h_cma + max(0, w_deposit) + max(0, w_cma)) / 10000)
                 })
-            
-            m = current_running_date.month + 1
-            y_offset = current_running_date.year
-            if m > 12: m = 1; y_offset += 1
-            current_running_date = datetime(y_offset, m, min(current_running_date.day, 28))
 
         avg_h_jesus = sum(h_jesus_monthly_balances) / 12
         h_jesus_interest   = avg_h_jesus * jesus_rate
@@ -192,7 +189,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             "아내예금_val": w_deposit_init, "아내CMA_val": w_cma_init
         })
 
-    # --- 결과 출력 ---
+    # --- 3단계 결과 출력 세션 ---
     st.header(f"🏁 3단계: [{setup_year_num}년차 ({start_date.year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황 (해당 연차 전용)"])
     target_res = yearly_records[setup_year_num - 1]
