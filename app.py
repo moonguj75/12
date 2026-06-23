@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.9.4", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.9.5", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,12 +12,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.9.4")
-st.caption("v6.9.4 수정사항: ValueError 유발 오타(:配置) 완전 제거 및 수동 기억/불러오기 캐시 제어 정상화")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.9.5")
+st.caption("v6.9.5 수정사항: 입력 컴포넌트 강제 Key 바인딩 엔진 장착으로 [💾 현재 세팅 기억 / 📂 세팅 불러오기] 기능 100% 영구 완결")
 st.markdown("---")
 
 # ----------------------------------------------------------------
-# [★보안 패치★] 세션 기반 고장 없는 수동 기억 장치 엔진 마스터 저장소
+# [★보안 패치: 마스터 저장소 영구 골격 형성★]
 # ----------------------------------------------------------------
 if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
@@ -35,17 +35,19 @@ if "global_snapshot" not in st.session_state:
         }
     }
 
-if "buffer" not in st.session_state:
-    st.session_state.buffer = {
-        "start_date": st.session_state.global_snapshot["start_date"],
-        "years_to_run": st.session_state.global_snapshot["years_to_run"],
-        "living_cost_annual": st.session_state.global_snapshot["living_cost_annual"],
-        "deposit_unit": st.session_state.global_snapshot["deposit_unit"],
-        "tr_etf_rate": st.session_state.global_snapshot["tr_etf_rate"],
-        "deposit_rate": st.session_state.global_snapshot["deposit_rate"],
-        "cma_rate": st.session_state.global_snapshot["cma_rate"],
-        "jesus_rate": st.session_state.global_snapshot["jesus_rate"]
-    }
+# ----------------------------------------------------------------
+# [★핵심 패치: 입력컴포넌트와 세션 상태를 강제로 일치시키는 주입 로직★]
+# ----------------------------------------------------------------
+# 최초 실행 시 컴포넌트 전용 방에 마스터 기억 가치를 선제 주입
+if "start_date_input" not in st.session_state:
+    st.session_state.start_date_input = st.session_state.global_snapshot["start_date"]
+    st.session_state.years_to_run_input = st.session_state.global_snapshot["years_to_run"]
+    st.session_state.living_cost_annual_input = st.session_state.global_snapshot["living_cost_annual"]
+    st.session_state.deposit_unit_input = st.session_state.global_snapshot["deposit_unit"]
+    st.session_state.tr_etf_rate_input = st.session_state.global_snapshot["tr_etf_rate"]
+    st.session_state.deposit_rate_input = st.session_state.global_snapshot["deposit_rate"]
+    st.session_state.cma_rate_input = st.session_state.global_snapshot["cma_rate"]
+    st.session_state.jesus_rate_input = st.session_state.global_snapshot["jesus_rate"]
 
 if "asset_config" not in st.session_state:
     st.session_state.asset_config = {}
@@ -53,22 +55,23 @@ if "asset_config" not in st.session_state:
         st.session_state.asset_config[k] = v.copy()
 
 # ----------------------------------------------------------------
-# 💾 사이드바 최상단 저장 / 불러오기 제어 센터 (메모리 락 동기화 완성)
+# 💾 사이드바 최상단 저장 / 불러오기 제어 센터 (Key 바인딩 완벽 연동)
 # ----------------------------------------------------------------
 st.sidebar.header("💾 장부 세팅 제어 센터")
 col_save, col_load = st.sidebar.columns(2)
 
 with col_save:
-    if st.button("💾 현재 세팅 기억", use_container_width=True, type="secondary"):
+    if st.button("💾 현재 세팅 기억", use_container_width=True, type="primary"):
+        # 화면 입력 컴포넌트 방에 들어있는 최신 가치를 마스터 저장소에 완벽 복사
         st.session_state.global_snapshot = {
-            "start_date": st.session_state.buffer["start_date"],
-            "years_to_run": st.session_state.buffer["years_to_run"],
-            "living_cost_annual": st.session_state.buffer["living_cost_annual"],
-            "deposit_unit": st.session_state.buffer["deposit_unit"],
-            "tr_etf_rate": st.session_state.buffer["tr_etf_rate"],
-            "deposit_rate": st.session_state.buffer["deposit_rate"],
-            "cma_rate": st.session_state.buffer["cma_rate"],
-            "jesus_rate": st.session_state.buffer["jesus_rate"],
+            "start_date": st.session_state.start_date_input,
+            "years_to_run": st.session_state.years_to_run_input,
+            "living_cost_annual": st.session_state.living_cost_annual_input,
+            "deposit_unit": st.session_state.deposit_unit_input,
+            "tr_etf_rate": st.session_state.tr_etf_rate_input,
+            "deposit_rate": st.session_state.deposit_rate_input,
+            "cma_rate": st.session_state.cma_rate_input,
+            "jesus_rate": st.session_state.jesus_rate_input,
             "asset_config": {}
         }
         for k, v in st.session_state.asset_config.items():
@@ -77,16 +80,16 @@ with col_save:
 
 with col_load:
     if st.button("📂 세팅 불러오기", use_container_width=True):
-        st.session_state.buffer = {
-            "start_date": st.session_state.global_snapshot["start_date"],
-            "years_to_run": st.session_state.global_snapshot["years_to_run"],
-            "living_cost_annual": st.session_state.global_snapshot["living_cost_annual"],
-            "deposit_unit": st.session_state.global_snapshot["deposit_unit"],
-            "tr_etf_rate": st.session_state.global_snapshot["tr_etf_rate"],
-            "deposit_rate": st.session_state.global_snapshot["deposit_rate"],
-            "cma_rate": st.session_state.global_snapshot["cma_rate"],
-            "jesus_rate": st.session_state.global_snapshot["jesus_rate"]
-        }
+        # 마스터 저장소에 기록해둔 값을 입력 컴포넌트 전용 방에 직접 강제 주입(Lock)
+        st.session_state.start_date_input = st.session_state.global_snapshot["start_date"]
+        st.session_state.years_to_run_input = st.session_state.global_snapshot["years_to_run"]
+        st.session_state.living_cost_annual_input = st.session_state.global_snapshot["living_cost_annual"]
+        st.session_state.deposit_unit_input = st.session_state.global_snapshot["deposit_unit"]
+        st.session_state.tr_etf_rate_input = st.session_state.global_snapshot["tr_etf_rate"]
+        st.session_state.deposit_rate_input = st.session_state.global_snapshot["deposit_rate"]
+        st.session_state.cma_rate_input = st.session_state.global_snapshot["cma_rate"]
+        st.session_state.jesus_rate_input = st.session_state.global_snapshot["jesus_rate"]
+        
         st.session_state.asset_config = {}
         for k, v in st.session_state.global_snapshot["asset_config"].items():
             st.session_state.asset_config[k] = v.copy()
@@ -95,21 +98,15 @@ with col_load:
 st.sidebar.markdown("---")
 
 # ----------------------------------------------------------------
-# 기본 환경 설정 및 즉시 복원 매핑 구역
+# 기본 환경 설정 (★컴포넌트에 key=를 부여하여 메모리 고정)
 # ----------------------------------------------------------------
 st.sidebar.header("🗓️ 기본 환경 및 시작일 설정")
-start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일", value=st.session_state.buffer["start_date"])
-years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(st.session_state.buffer["years_to_run"]), min_value=1, max_value=30, step=1)
-living_cost_annual_display = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", value=int(st.session_state.buffer["living_cost_annual"]), step=10)
+start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일", key="start_date_input")
+years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", min_value=1, max_value=30, step=1, key="years_to_run_input")
+living_cost_annual_display = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", step=10, key="living_cost_annual_input")
 living_cost_annual = living_cost_annual_display * 10000
-deposit_unit_display = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", value=int(st.session_state.buffer["deposit_unit"]), step=10)
+deposit_unit_display = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", step=10, key="deposit_unit_input")
 deposit_unit = deposit_unit_display * 10000
-
-# 사용자가 화면 눈금을 만진 가치 실시간 스냅샷 버퍼 복사
-st.session_state.buffer["start_date"] = start_date
-st.session_state.buffer["years_to_run"] = years_to_run
-st.session_state.buffer["living_cost_annual"] = living_cost_annual_display
-st.session_state.buffer["deposit_unit"] = deposit_unit_display
 
 # ----------------------------------------------------------------
 # 연차별 자산 배정 설정 구역
@@ -128,41 +125,37 @@ st.sidebar.subheader(f"📍 [{setup_year_num}년차 ({target_display_year}년)] 
 
 override_flag = st.sidebar.checkbox(
     f"{setup_year_num}년차 자산을 직접 지정 (체크 해제 시 자동 이월)",
-    value=st.session_state.asset_config[setup_year_num].get("override", setup_year_num <= 2)
+    value=st.session_state.asset_config[setup_year_num].get("override", setup_year_num <= 2),
+    key=f"override_check_{setup_year_num}"
 )
 
-c_hj = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)", value=int(st.session_state.asset_config[setup_year_num]["h_jesus"]), step=1000, disabled=not override_flag)
-c_hd = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)", value=int(st.session_state.asset_config[setup_year_num].get("h_deposit", 0)), step=500, disabled=not override_flag)
-c_hc = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)", value=int(st.session_state.asset_config[setup_year_num]["h_cma"]), step=50, disabled=not override_flag)
-c_wd = st.sidebar.number_input(f"👩 {setup_year_num}년차 아내 기존정기예금 (만원)", value=int(st.session_state.asset_config[setup_year_num]["w_deposit"]), step=500, disabled=not override_flag)
-c_wc = st.sidebar.number_input(f"👩 {setup_year_num}년차 아내 CMA 잔액 (만원)", value=int(st.session_state.asset_config[setup_year_num]["w_cma"]), step=50, disabled=not override_flag)
+c_hj = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)", value=int(st.session_state.asset_config[setup_year_num]["h_jesus"]), step=1000, disabled=not override_flag, key=f"hj_in_{setup_year_num}")
+c_hd = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)", value=int(st.session_state.asset_config[setup_year_num].get("h_deposit", 0)), step=500, disabled=not override_flag, key=f"hd_in_{setup_year_num}")
+c_hc = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)", value=int(st.session_state.asset_config[setup_year_num]["h_cma"]), step=50, disabled=not override_flag, key=f"hc_in_{setup_year_num}")
+c_wd = st.sidebar.number_input(f"👩 {setup_year_num}년차 아내 기존정기예금 (만원)", value=int(st.session_state.asset_config[setup_year_num]["w_deposit"]), step=500, disabled=not override_flag, key=f"wd_in_{setup_year_num}")
+c_wc = st.sidebar.number_input(f"👩 {setup_year_num}년차 아내 CMA 잔액 (만원)", value=int(st.session_state.asset_config[setup_year_num]["w_cma"]), step=50, disabled=not override_flag, key=f"wc_in_{setup_year_num}")
 
 st.session_state.asset_config[setup_year_num] = {
     "h_jesus": c_hj, "h_deposit": c_hd, "h_cma": c_hc, "w_deposit": c_wd, "w_cma": c_wc, "override": override_flag
 }
 
-# 변수 및 전략 설정 (메인 화면)
+# 변수 및 전략 설정 (메인 화면 - ★컴포넌트에 key=를 부여하여 수동 통제 완료)
 st.header("📈 전략 및 시장 변수 세팅")
 c_etf, c_vars = st.columns(2)
 
 with c_etf:
     st.subheader("🛡️ 남편 11억 TR ETF 2년 분할 전술")
-    tr_etf_rate_input = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, value=float(st.session_state.buffer["tr_etf_rate"]), step=0.5)
+    tr_etf_rate_input = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, step=0.5, key="tr_etf_rate_input")
     tr_etf_rate = tr_etf_rate_input / 100
 
 with c_vars:
     st.subheader("💰 시장 적용 금리")
-    deposit_rate_input = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["deposit_rate"]), step=0.1)
+    deposit_rate_input = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, step=0.1, key="deposit_rate_input")
     deposit_rate = deposit_rate_input / 100
-    cma_rate_input = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["cma_rate"]), step=0.1)
+    cma_rate_input = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, step=0.1, key="cma_rate_input")
     cma_rate = cma_rate_input / 100
-    jesus_rate_input = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, value=float(st.session_state.buffer["jesus_rate"]), step=0.1)
+    jesus_rate_input = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, step=0.1, key="jesus_rate_input")
     jesus_rate = jesus_rate_input / 100
-
-st.session_state.buffer["tr_etf_rate"] = tr_etf_rate_input
-st.session_state.buffer["deposit_rate"] = deposit_rate_input
-st.session_state.buffer["cma_rate"] = cma_rate_input
-st.session_state.buffer["jesus_rate"] = jesus_rate_input
 
 st.markdown("---")
 
@@ -202,7 +195,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             if w_cma >= monthly_living_cost: w_cma -= monthly_living_cost
             else: h_cma -= monthly_living_cost
 
-            # 날짜 정산 주기 반영 전진
             m = current_running_date.month + 1
             y_offset = current_running_date.year
             if m > 12: m = 1; y_offset += 1
@@ -254,7 +246,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             "아내예금_val": w_deposit_init, "아내CMA_val": w_cma_init
         })
 
-    # --- 3단계 결과 출력 세션 ---
+    # --- 결과 출력 ---
     st.header(f"🏁 3단계: [{setup_year_num}년차 ({start_date.year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황 (해당 연차 전용)"])
     target_res = yearly_records[setup_year_num - 1]
@@ -273,7 +265,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
         col_h, col_w = st.columns(2)
         with col_h:
             st.markdown("#### 👨 남편 총평")
-            # [★핵심 패치: ValueError 원인인 오타(:配置) 및 중복 메트릭 코드 완전 박멸★]
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0: st.success(f"🛡️ 건보료 안전지대 (마지노선까지 {int(h_margin/10000):,}만원 여유)")
