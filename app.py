@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.7.3", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,8 +11,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.7.3")
-st.caption("v6.7.3 수정사항: 리포트 출력 구문을 버튼 내부로 완전 격리하여 KeyError 영구 제거")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8")
+st.caption("v6.8 수정사항: TR ETF 자산 인출 불가(철벽 격리) 및 실제 가용 현금(CMA) 중심 생활비 차감 로직 정밀 반영")
 st.markdown("---")
 
 # 기본 설정 및 기간 입력 (사이드바 상단)
@@ -42,7 +42,6 @@ for y in range(1, years_to_run + 1):
 
 st.sidebar.subheader(f"📍 [{selected_setup_year}] 초기 자산 배정")
 
-# override 플래그: 해당 연차에 사용자가 직접 값을 지정할지 여부
 override_flag = st.sidebar.checkbox(
     f"{selected_setup_year} 자산을 직접 지정 (체크 해제 시 자동 이월)",
     value=st.session_state.asset_config[setup_year_num].get("override", setup_year_num <= 2)
@@ -76,7 +75,6 @@ st.markdown("---")
 
 setup_year_num = int(selected_setup_year.replace("년차", ""))
 
-# [★핵심 해결책★] 버튼을 눌렀을 때만 모든 연산과 리포트 출력이 동작하도록 if 블록 내부에 매립
 if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동", type="primary"):
     carry_h_jesus = 0
     carry_h_cma = 0
@@ -107,8 +105,44 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         w_new_deposit= cfg["w_new_deposit"] * 10000 if use_override else carry_w_new_deposit
         w_cma        = cfg["w_cma"] * 10000         if use_override else carry_w_cma
 
+        h_jesus_monthly_balances = []
+
+        # 12개월 연산 가동
+        for month in range(1, 13):
+            h_jesus_monthly_balances.append(h_jesus)
+
+            # 1~2년차 예수금 -> TR ETF 월별 분할 이동
+            if year <= 2:
+                if h_jesus >= monthly_tr_transfer:
+                    h_jesus -= monthly_tr_transfer
+                    h_tr_etf += monthly_tr_transfer
+                else:
+                    h_tr_etf += h_jesus
+                    h_jesus = 0
+
+            # [★핵심 변경★] 진짜 꺼내 쓸 수 있는 가용 현금 주머니에서만 차감
+            if w_cma >= monthly_living_cost:
+                w_cma -= monthly_living_cost  # 5년차까지는 아내 CMA 지갑에서 차감
+            else:
+                # 아내 돈이 바닥나면 '인출 불가능한 TR ETF'는 건드리지 않고 오직 '남편 CMA'에서만 차감!
+                h_cma -= monthly_living_cost
+
+            if year == setup_year_num:
+                monthly_records.append({
+                    "연차": f"{year}년차",
+                    "월": f"{month}월",
+                    "👨남편 주식예수금": int(h_jesus / 10000),
+                    "👨남편 CMA잔액(가용현금)": int(h_cma / 10000),
+                    "👨남편 지수TR ETF(잠금)": int(h_tr_etf / 10000),
+                    "👩아내 정기예금": int(max(0, (w_deposit + w_new_deposit)) / 10000),
+                    "👩아내 CMA": int(max(0, w_cma) / 10000),
+                    "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_cma + max(0, w_deposit + w_new_deposit) + max(0, w_cma)) / 10000)
+                })
+
         # 이자 산출
-        h_jesus_interest   = h_jesus * jesus_rate
+        avg_h_jesus = sum(h_jesus_monthly_balances) / 12
+        h_jesus_interest = avg_h_jesus * jesus_rate
+        
         h_cma_interest     = h_cma * cma_rate
         h_interest_pre     = h_jesus_interest + h_cma_interest
 
@@ -121,41 +155,13 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         w_interest_post    = int(w_interest_pre * (1 - tax_rate))
         total_income_post  = h_interest_post + w_interest_post
 
+        # 세후 이자 입금 처리
         if year <= 5:
             w_cma += total_income_post
         else:
             h_cma += total_income_post
 
-        # 12개월 연산
-        for month in range(1, 13):
-            if year <= 2:
-                if h_jesus >= monthly_tr_transfer:
-                    h_jesus -= monthly_tr_transfer
-                    h_tr_etf += monthly_tr_transfer
-                else:
-                    h_tr_etf += h_jesus
-                    h_jesus = 0
-
-            if w_cma >= monthly_living_cost:
-                w_cma -= monthly_living_cost
-            else:
-                if h_cma >= monthly_living_cost:
-                    h_cma -= monthly_living_cost
-                else:
-                    h_cma = 0
-
-            if year == setup_year_num:
-                monthly_records.append({
-                    "연차": f"{year}년차",
-                    "월": f"{month}월",
-                    "👨남편 주식예수금": int(h_jesus / 10000),
-                    "👨남편 CMA잔액": int(h_cma / 10000),
-                    "👨남편 지수TR ETF": int(h_tr_etf / 10000),
-                    "👩아내 정기예금": int(max(0, (w_deposit + w_new_deposit)) / 10000),
-                    "👩아내 CMA": int(max(0, w_cma) / 10000),
-                    "👪부부 합산 자산": int((h_jesus + h_cma + h_tr_etf + max(0, w_deposit + w_new_deposit) + max(0, w_cma)) / 10000)
-                })
-
+        # TR ETF는 내부적으로만 복리로 우상향 (생활비 방어에 기여 안 함)
         h_tr_etf = int(h_tr_etf * (1 + tr_etf_rate))
 
         deficit  = int(living_cost_annual - total_income_post)
@@ -187,7 +193,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             "잔돈": leftover
         })
 
-    # --- 결과 출력 (버튼 클릭 시에만 활성화되도록 들여쓰기 적용) ---
+    # --- 결과 출력 ---
     st.header(f"🏁 3단계: [{selected_setup_year}] 집중 분석 리포트")
 
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황 (해당 연차 전용)"])
@@ -200,7 +206,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             st.markdown("#### 👨 남편 명의 이자 명세서")
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             st.markdown(f"""
-            * **주식 예수금 이용료 (연 0.6%):** {int(target_res['남편예수금이차']/10000):,} 만원
+            * **주식 예수금 이용료 (월할 변동 평균 반영):** {int(target_res['남편예수금이차']/10000):,} 만원
             * **대신증권 CMA 이자:** {int(target_res['남편CMA이자']/10000):,} 만원
             """)
             h_margin = 10000000 - target_res['남편세전']
@@ -239,11 +245,11 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         st.dataframe(
             df_monthly.style.format({
                 "👨남편 주식예수금": "{:,} 만원",
-                "👨남편 CMA잔액": "{:,} 만원",
-                "👨남편 지수TR ETF": "{:,} 만원",
+                "👨남편 CMA잔액(가용현금)": "{:,} 만원",
+                "👨남편 지수TR ETF(잠금)": "{:,} 만원",
                 "👩아내 정기예금": "{:,} 만원",
                 "👩아내 CMA": "{:,} 만원",
-                "👪부부 합산 자산": "{:,} 만원"
+                "👪부부 찐 가용자산(CMA+예금)": "{:,} 만원"
             }),
             use_container_width=True,
             height=450
