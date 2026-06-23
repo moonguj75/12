@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import copy
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.7", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.8", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,8 +12,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.7")
-st.caption("v7.7 핵심 수정: st.session_state 위젯 연동 안정화로 ValueError 완벽 방지 및 실시간 저장 강화")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.8")
+st.caption("v7.8 핵심 수정: st.metric 내 불필요한 오타(配置) 완벽 제거 및 안정화 패치")
 st.markdown("---")
 
 # 기본 자산 딕셔너리 생성 함수
@@ -108,7 +108,7 @@ for y in range(1, int(cfg["years_to_run"]) + 1):
     cfg["asset_config"].setdefault(y, DEFAULT_ASSET())
 
 # ============================================================
-# 5. 연차별 자산 설정 (튕김 없는 실시간 미러링 보존)
+# 5. 연차별 자산 설정
 # ============================================================
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 연차별 자산 설정")
@@ -137,7 +137,7 @@ ac["override"] = st.sidebar.checkbox(
     value=bool(ac["override"])
 )
 
-# 입력 상자에 값을 칠 때 즉시 딕셔너리에 대입되도록 구현 (고정 완료)
+# 입력 상자 자산 고정 대입
 ac["h_jesus"]   = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)",  step=1000, value=int(ac["h_jesus"]),   disabled=not ac["override"])
 ac["h_deposit"] = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)",      step=500,  value=int(ac["h_deposit"]), disabled=not ac["override"])
 ac["h_cma"]     = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)",      step=50,   value=int(ac["h_cma"]),     disabled=not ac["override"])
@@ -314,7 +314,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
         col_h, col_w = st.columns(2)
         with col_h:
             st.markdown("#### 👨 남편 총평")
-            st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):配置} 만원".replace('配置', '').replace('配置', ''))
+            # ★ 오타(配置) 완벽 박멸 완료
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0:
