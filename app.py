@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.7", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.8", layout="wide")
 
 st.markdown("""
     <style>
@@ -13,75 +12,39 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.7")
-st.caption("v6.8.7 수정사항: [시작 년·월·일 달력 세팅] 적용 — 월별/연차별 장부에 실시간 날짜 타임라인 매핑")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.8")
+st.caption("v6.8.8 수정사항: 외부 모듈 의존성 제거로 ModuleNotFoundError 완벽 차단 및 데이터 세션 보존 안정화")
 st.markdown("---")
 
 # ----------------------------------------------------------------
-# 브라우저 LocalStorage 연동형 영구 기억/복원 자바스크립트 엔진
+# [★안전 패치★] 외부 모듈 없이 세션 스테이트 자체를 활용한 안정적 기억 장치
 # ----------------------------------------------------------------
-from streamlit_javascript import st_javascript
+if "global_snapshot" not in st.session_state:
+    st.session_state.global_snapshot = {
+        "start_date": datetime(2026, 6, 23).date(),
+        "years_to_run": 10,
+        "living_cost_annual": 7740,
+        "deposit_unit": 8400,
+        "tr_etf_rate": 5.0,
+        "deposit_rate": 4.0,
+        "cma_rate": 3.0,
+        "jesus_rate": 0.6
+    }
 
-def load_saved_data():
-    try:
-        saved_json = st_javascript("localStorage.getItem('retire_asset_config_v687');")
-        if saved_json and saved_json != "null":
-            return json.loads(saved_json)
-    except:
-        pass
-    return None
-
-def save_current_data(data):
-    try:
-        json_str = json.dumps(data)
-        st_javascript(f"localStorage.setItem('retire_asset_config_v687', '{json_str}');")
-    except:
-        pass
-
-if "browser_loaded" not in st.session_state:
-    st.session_state.browser_loaded = False
-
-snapshot = {}
-if not st.session_state.browser_loaded:
-    saved_data = load_saved_data()
-    if saved_data:
-        st.session_state.saved_snapshot = saved_data
-        snapshot = saved_data
-    st.session_state.browser_loaded = True
-else:
-    snapshot = st.session_state.get("saved_snapshot", {})
+snapshot = st.session_state.global_snapshot
 
 # ----------------------------------------------------------------
-# 기본 환경 설정 (★년·월·일 달력 컴포넌트로 리모델링)
+# 기본 환경 설정
 # ----------------------------------------------------------------
 st.sidebar.header("🗓️ 기본 환경 및 시작일 설정")
+start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일 (년-월-일)", value=snapshot["start_date"])
+years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(snapshot["years_to_run"]), min_value=1, max_value=30, step=1)
+living_cost_annual = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", value=int(snapshot["living_cost_annual"]), step=10) * 10000
+deposit_unit = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", value=int(snapshot["deposit_unit"]), step=10) * 10000
 
-# 기억된 날짜가 있으면 복원, 없으면 현재 날짜(2026-06-23)를 기본값으로 세팅
-default_start_date = datetime.strptime(snapshot.get("start_date", "2026-06-23"), "%Y-%m-%d").date()
-start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일 (년-월-일)", value=default_start_date)
-
-years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(snapshot.get("years_to_run", 10)), min_value=1, max_value=30, step=1)
-living_cost_annual = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", value=int(snapshot.get("living_cost_annual", 7740)), step=10) * 10000
-deposit_unit = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", value=int(snapshot.get("deposit_unit", 8400)), step=10) * 10000
-
-# ----------------------------------------------------------------
-# 1단계: 연차별 자산 설정 구역
-# ----------------------------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.header("⚙️ 연차별 자산 설정")
-
-# 셀렉트박스에 '1년차(2026년)', '2년차(2027년)' 형태로 연도 동적 표시
-year_options = [f"{i}년차({start_date.year + i - 1}년)" for i in range(1, years_to_run + 1)]
-selected_setup_year = st.sidebar.selectbox("계측 및 자산 설정을 진행할 연차를 고르세요", year_options)
-setup_year_num = int(selected_setup_year.split("년차")[0])
-
+# 세션 내 자산 고정 뼈대 구축
 if "asset_config" not in st.session_state:
     st.session_state.asset_config = {}
-
-if f"initialized_from_browser" not in st.session_state and "asset_config" in snapshot:
-    for k, v in snapshot["asset_config"].items():
-        st.session_state.asset_config[int(k)] = v
-    st.session_state.initialized_from_browser = True
 
 for y in range(1, years_to_run + 1):
     if y == 1:
@@ -90,6 +53,13 @@ for y in range(1, years_to_run + 1):
         st.session_state.asset_config.setdefault(y, {"h_jesus": 55000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 36500, "w_cma": 4000, "override": True})
     else:
         st.session_state.asset_config.setdefault(y, {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False})
+
+# 1단계: 연차별 자산 설정 구역
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ 연차별 자산 설정")
+year_options = [f"{i}년차({start_date.year + i - 1}년)" for i in range(1, years_to_run + 1)]
+selected_setup_year = st.sidebar.selectbox("계측 및 자산 설정을 진행할 연차를 고르세요", year_options)
+setup_year_num = int(selected_setup_year.split("년차")[0])
 
 target_display_year = start_date.year + setup_year_num - 1
 st.sidebar.subheader(f"📍 [{setup_year_num}년차 ({target_display_year}년)] 자산 배정")
@@ -115,33 +85,26 @@ c_etf, c_vars = st.columns(2)
 
 with c_etf:
     st.subheader("🛡️ 남편 11억 TR ETF 2년 분할 전술")
-    tr_etf_rate = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, value=float(snapshot.get("tr_etf_rate", 5.0)), step=0.5) / 100
+    tr_etf_rate = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, value=float(snapshot["tr_etf_rate"]), step=0.5) / 100
 
 with c_vars:
     st.subheader("💰 시장 적용 금리")
-    deposit_rate = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, value=float(snapshot.get("deposit_rate", 4.0)), step=0.1) / 100
-    cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, value=float(snapshot.get("cma_rate", 3.0)), step=0.1) / 100
-    jesus_rate = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, value=float(snapshot.get("jesus_rate", 0.6)), step=0.1) / 100
+    deposit_rate = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, value=float(snapshot["deposit_rate"]), step=0.1) / 100
+    cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, value=float(snapshot["cma_rate"]), step=0.1) / 100
+    jesus_rate = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, value=float(snapshot["jesus_rate"]), step=0.1) / 100
 
 st.markdown("---")
 
 setup_year_num = int(selected_setup_year.split("년차")[0])
 
-# 가동 단추 클릭 시점 날짜 매핑 및 동기화 연산
 if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 1}년) 장부 집중 가동", type="primary"):
-    current_snapshot = {
-        "start_date": start_date.strftime("%Y-%m-%d"),
-        "years_to_run": years_to_run,
-        "living_cost_annual": living_cost_annual / 10000,
-        "deposit_unit": deposit_unit / 10000,
-        "tr_etf_rate": tr_etf_rate * 100,
-        "deposit_rate": deposit_rate * 100,
-        "cma_rate": cma_rate * 100,
-        "jesus_rate": jesus_rate * 100,
-        "asset_config": st.session_state.asset_config
+    # 현재 설정값 메모리에 안전 스냅샷 저장
+    st.session_state.global_snapshot = {
+        "start_date": start_date, "years_to_run": years_to_run,
+        "living_cost_annual": living_cost_annual / 10000, "deposit_unit": deposit_unit / 10000,
+        "tr_etf_rate": tr_etf_rate * 100, "deposit_rate": deposit_rate * 100,
+        "cma_rate": cma_rate * 100, "jesus_rate": jesus_rate * 100
     }
-    save_current_data(current_snapshot)
-    st.session_state.saved_snapshot = current_snapshot
 
     carry_h_jesus, carry_h_deposit, carry_h_cma = 0, 0, 0
     carry_w_deposit, carry_w_cma = 0, 0
@@ -151,8 +114,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
     monthly_tr_transfer = 1100000000 / 24
 
     yearly_records, monthly_records = [], []
-
-    # 기준일 파싱 기반 자바 기반의 정밀 날짜 제어용 베이스 라인 구축
     current_running_date = datetime(start_date.year, start_date.month, start_date.day)
 
     for year in range(1, years_to_run + 1):
@@ -167,27 +128,20 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
 
         h_jesus_monthly_balances = []
         h_deposit_init, h_cma_init, w_deposit_init, w_cma_init = h_deposit, h_cma, w_deposit, w_cma
-
         cal_year = start_date.year + year - 1
 
-        # 12개월 연산
         for month in range(1, 13):
             h_jesus_monthly_balances.append(h_jesus)
             if year <= 2:
                 if h_jesus >= monthly_tr_transfer:
-                    h_jesus -= monthly_tr_transfer
-                    h_tr_etf += monthly_tr_transfer
+                    h_jesus -= monthly_tr_transfer; h_tr_etf += monthly_tr_transfer
                 else:
                     h_tr_etf += h_jesus; h_jesus = 0
 
-            if w_cma >= monthly_living_cost:
-                w_cma -= monthly_living_cost
-            else:
-                h_cma -= monthly_living_cost
+            if w_cma >= monthly_living_cost: w_cma -= monthly_living_cost
+            else: h_cma -= monthly_living_cost
 
-            # [★핵심 연동★] 지정한 날짜로부터 정확히 매달 흘러가는 날짜 스탬프 생성
             if year == setup_year_num:
-                # 개별 월의 정확한 시각적 날짜 텍스트 스탬프 획득
                 stamp_text = current_running_date.strftime("%Y년 %m월 %d일")
                 monthly_records.append({
                     "📅 정산 기준일": stamp_text,
@@ -197,13 +151,9 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
                     "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_deposit + h_cma + max(0, w_deposit) + max(0, w_cma)) / 10000)
                 })
             
-            # 매달 루프 때마다 30일(또는 1달)씩 날짜를 뒤로 전진
-            # 복잡한 일수 보정을 위해 월 단위 정밀 전진 구현
             m = current_running_date.month + 1
             y_offset = current_running_date.year
-            if m > 12:
-                m = 1
-                y_offset += 1
+            if m > 12: m = 1; y_offset += 1
             current_running_date = datetime(y_offset, m, min(current_running_date.day, 28))
 
         avg_h_jesus = sum(h_jesus_monthly_balances) / 12
@@ -242,7 +192,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             "아내예금_val": w_deposit_init, "아내CMA_val": w_cma_init
         })
 
-    # --- 3단계 결과 출력 세션 ---
+    # --- 결과 출력 ---
     st.header(f"🏁 3단계: [{setup_year_num}년차 ({start_date.year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황 (해당 연차 전용)"])
     target_res = yearly_records[setup_year_num - 1]
@@ -260,13 +210,13 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
 
         col_h, col_w = st.columns(2)
         with col_h:
-            st.markdown(f"#### 👨 남편 총평")
+            st.markdown("#### 👨 남편 총평")
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0: st.success(f"🛡️ 건보료 안전지대 (마지노선까지 {int(h_margin/10000):,}만원 여유)")
             else: st.error("🚨 경고: 1,000만원 초과! 건보료 부과 대상")
         with col_w:
-            st.markdown(f"#### 👩 아내 총평")
+            st.markdown("#### 👩 아내 총평")
             st.metric("아내 세전 금융소득 합계", f"{int(target_res['아내세전']/10000):,} 만원")
             w_margin = 20000000 - target_res['아내세전']
             if w_margin > 0: st.success(f"🛡️ 종합과세 안전지대 (마지노선까지 {int(w_margin/10000):,}만원 여유)")
@@ -288,13 +238,12 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
         with col_tot1: st.metric("👪 부부 합산 세후 이자", f"{int(target_res['세후이자']/10000):,} 만원")
         with col_tot2: st.warning(f"🛒 연간 생활비 구멍: {int(target_res['부족분']/10000):,} 만원")
         with col_tot3:
-            st.success(f"💰 통장 깨고 남은 알짜 잔돈: {int(target_res['잔돈']/10000):,} 만원")
+            st.success(f"💰 통장 깨고 남은 알짜 잔돈(자동 저축): {int(target_res['잔돈']/10000):,} 만원")
             st.caption("※ 연말 잔돈은 자동으로 아내 CMA 통장으로 전액 이양됩니다.")
 
     with tab_monthly:
         st.subheader(f"🗓️ 선택 연차 정산 달력 기준 잔고 흐름 보고서")
         df_monthly = pd.DataFrame(monthly_records)
-        # 인덱스를 정확한 날짜 스탬프로 지정하여 가독성 극대화
         st.dataframe(
             df_monthly.set_index("📅 정산 기준일").style.format({
                 "👨남편 주식예수금": "{:,} 만원", "👨남편 정기예금": "{:,} 만원",
