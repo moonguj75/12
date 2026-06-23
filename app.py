@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.9", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.9.1", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,12 +12,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.9")
-st.caption("v6.9 수정사항: 사이드바 상단 [💾 현재 세팅 기억] 및 [📂 세팅 불러오기] 수동 저장 버튼 시스템 신설")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.9.1")
+st.caption("v6.9.1 수정사항: 입력창 변경 즉시 세션 버퍼에 동기화되도록 패치하여 [💾 현재 세팅 기억] 기능 무결점화")
 st.markdown("---")
 
 # ----------------------------------------------------------------
-# [★핵심 패치★] 세션 기반 수동 영구 기억 장치 엔진 초기화
+# [★안전 장치★] 영구 기억 장치 및 실시간 입력 감지 버퍼 초기화
 # ----------------------------------------------------------------
 if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
@@ -35,9 +35,22 @@ if "global_snapshot" not in st.session_state:
         }
     }
 
-# 현재 화면 입력을 제어할 임시 버퍼 생성
 if "buffer" not in st.session_state:
     st.session_state.buffer = st.session_state.global_snapshot.copy()
+
+if "asset_config" not in st.session_state:
+    st.session_state.asset_config = st.session_state.buffer["asset_config"].copy()
+
+# [★핵심 패치★] 화면에서 조정한 숫자가 즉시 버퍼에 누적 보존되도록 연동하는 콜백 함수들
+def update_buffer_meta():
+    st.session_state.buffer["start_date"] = st.session_state.start_date_input
+    st.session_state.buffer["years_to_run"] = st.session_state.years_to_run_input
+    st.session_state.buffer["living_cost_annual"] = st.session_state.living_cost_annual_input
+    st.session_state.buffer["deposit_unit"] = st.session_state.deposit_unit_input
+    st.session_state.buffer["tr_etf_rate"] = st.session_state.tr_etf_rate_input
+    st.session_state.buffer["deposit_rate"] = st.session_state.deposit_rate_input
+    st.session_state.buffer["cma_rate"] = st.session_state.cma_rate_input
+    st.session_state.buffer["jesus_rate"] = st.session_state.jesus_rate_input
 
 # ----------------------------------------------------------------
 # 💾 사이드바 최상단 저장 / 불러오기 제어 센터
@@ -47,52 +60,52 @@ col_save, col_load = st.sidebar.columns(2)
 
 with col_save:
     if st.button("💾 현재 세팅 기억", use_container_width=True, type="secondary"):
-        # 현재 사이드바와 메인 화면에 세팅된 값을 마스터 저장소에 영구 박제
+        # 실시간 버퍼에 쌓여있던 가장 따끈따끈한 세팅 가치를 마스터 저장소에 영구 박제
         st.session_state.global_snapshot = {
-            "start_date": st.session_state.get("start_date_input", datetime(2026, 6, 23).date()),
-            "years_to_run": st.session_state.get("years_to_run_input", 10),
-            "living_cost_annual": st.session_state.get("living_cost_annual_input", 7740),
-            "deposit_unit": st.session_state.get("deposit_unit_input", 8400),
-            "tr_etf_rate": st.session_state.get("tr_etf_rate_input", 5.0),
-            "deposit_rate": st.session_state.get("deposit_rate_input", 4.0),
-            "cma_rate": st.session_state.get("cma_rate_input", 3.0),
-            "jesus_rate": st.session_state.get("jesus_rate_input", 0.6),
+            "start_date": st.session_state.buffer["start_date"],
+            "years_to_run": st.session_state.buffer["years_to_run"],
+            "living_cost_annual": st.session_state.buffer["living_cost_annual"],
+            "deposit_unit": st.session_state.buffer["deposit_unit"],
+            "tr_etf_rate": st.session_state.buffer["tr_etf_rate"],
+            "deposit_rate": st.session_state.buffer["deposit_rate"],
+            "cma_rate": st.session_state.buffer["cma_rate"],
+            "jesus_rate": st.session_state.buffer["jesus_rate"],
             "asset_config": st.session_state.asset_config.copy()
         }
         st.sidebar.success("정확하게 기억 완료!")
 
 with col_load:
     if st.button("📂 세팅 불러오기", use_container_width=True):
-        # 마스터 저장소의 값을 버퍼로 강제 견인하여 화면 복원
+        # 마스터 저장소 값을 버퍼와 자산 설정창으로 강제 복원 유도
         st.session_state.buffer = st.session_state.global_snapshot.copy()
-        for k, v in st.session_state.global_snapshot["asset_config"].items():
-            st.session_state.asset_config[k] = v
+        st.session_state.asset_config = st.session_state.global_snapshot["asset_config"].copy()
         st.rerun()
 
 st.sidebar.markdown("---")
 
 # ----------------------------------------------------------------
-# 기본 환경 설정 (버퍼 데이터를 가치 베이스로 연동)
+# 기본 환경 설정 (on_change를 걸어 실시간으로 입력 탈취)
 # ----------------------------------------------------------------
 st.sidebar.header("🗓️ 기본 환경 및 시작일 설정")
-start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일", value=st.session_state.buffer["start_date"], key="start_date_input")
-years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(st.session_state.buffer["years_to_run"]), min_value=1, max_value=30, step=1, key="years_to_run_input")
-living_cost_annual = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", value=int(st.session_state.buffer["living_cost_annual"]), step=10, key="living_cost_annual_input") * 10000
-deposit_unit = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", value=int(st.session_state.buffer["deposit_unit"]), step=10, key="deposit_unit_input") * 10000
+start_date = st.sidebar.date_input("🚀 시뮬레이션 기준 시작일", value=st.session_state.buffer["start_date"], key="start_date_input", on_change=update_buffer_meta)
+years_to_run = st.sidebar.number_input("📊 전체 시뮬레이션 기간 (년)", value=int(st.session_state.buffer["years_to_run"]), min_value=1, max_value=30, step=1, key="years_to_run_input", on_change=update_buffer_meta)
+living_cost_annual_display = st.sidebar.number_input("🛒 연간 총 생활비 (만원)", value=int(st.session_state.buffer["living_cost_annual"]), step=10, key="living_cost_annual_input", on_change=update_buffer_meta)
+living_cost_annual = living_cost_annual_display * 10000
+deposit_unit_display = st.sidebar.number_input("🔓 매년 만기/소비되는 아내 예금 단위", value=int(st.session_state.buffer["deposit_unit"]), step=10, key="deposit_unit_input", on_change=update_buffer_meta)
+deposit_unit = deposit_unit_display * 10000
 
-# 세션 자산 뼈대 안전망
-if "asset_config" not in st.session_state:
-    st.session_state.asset_config = st.session_state.buffer["asset_config"].copy()
-
-for y in range(1, years_to_run + 1):
-    st.session_state.asset_config.setdefault(y, {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False})
-
+# ----------------------------------------------------------------
 # 1단계: 연차별 자산 설정 구역
+# ----------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 연차별 자산 설정")
 year_options = [f"{i}년차({start_date.year + i - 1}년)" for i in range(1, years_to_run + 1)]
 selected_setup_year = st.sidebar.selectbox("계측 및 자산 설정을 진행할 연차를 고르세요", year_options)
 setup_year_num = int(selected_setup_year.split("년차")[0])
+
+# 빈 연차 자동 이월 안전망 형성
+for y in range(1, years_to_run + 1):
+    st.session_state.asset_config.setdefault(y, {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False})
 
 target_display_year = start_date.year + setup_year_num - 1
 st.sidebar.subheader(f"📍 [{setup_year_num}년차 ({target_display_year}년)] 자산 배정")
@@ -112,19 +125,19 @@ st.session_state.asset_config[setup_year_num] = {
     "h_jesus": c_hj, "h_deposit": c_hd, "h_cma": c_hc, "w_deposit": c_wd, "w_cma": c_wc, "override": override_flag
 }
 
-# 변수 및 전략 설정 (메인 화면)
+# 변수 및 전략 설정 (메인 화면 - 실시간 동기화 연동)
 st.header("📈 전략 및 시장 변수 세팅")
 c_etf, c_vars = st.columns(2)
 
 with c_etf:
     st.subheader("🛡️ 남편 11억 TR ETF 2년 분할 전술")
-    tr_etf_rate = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, value=float(st.session_state.buffer["tr_etf_rate"]), step=0.5, key="tr_etf_rate_input") / 100
+    tr_etf_rate = st.slider("지수 TR ETF 예상 연 수익률 (%)", 1.0, 10.0, value=float(st.session_state.buffer["tr_etf_rate"]), step=0.5, key="tr_etf_rate_input", on_change=update_buffer_meta) / 100
 
 with c_vars:
     st.subheader("💰 시장 적용 금리")
-    deposit_rate = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["deposit_rate"]), step=0.1, key="deposit_rate_input") / 100
-    cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["cma_rate"]), step=0.1, key="cma_rate_input") / 100
-    jesus_rate = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, value=float(st.session_state.buffer["jesus_rate"]), step=0.1, key="jesus_rate_input") / 100
+    deposit_rate = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["deposit_rate"]), step=0.1, key="deposit_rate_input", on_change=update_buffer_meta) / 100
+    cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, value=float(st.session_state.buffer["cma_rate"]), step=0.1, key="cma_rate_input", on_change=update_buffer_meta) / 100
+    jesus_rate = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, value=float(st.session_state.buffer["jesus_rate"]), step=0.1, key="jesus_rate_input", on_change=update_buffer_meta) / 100
 
 st.markdown("---")
 
@@ -164,7 +177,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             if w_cma >= monthly_living_cost: w_cma -= monthly_living_cost
             else: h_cma -= monthly_living_cost
 
-            # 정산 이후 캘린더 전진 연산 후 표 기록
+            # 정산 이후 캘린더 연산 전진
             m = current_running_date.month + 1
             y_offset = current_running_date.year
             if m > 12: m = 1; y_offset += 1
@@ -216,7 +229,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date.year + setup_year_num - 
             "아내예금_val": w_deposit_init, "아내CMA_val": w_cma_init
         })
 
-    # --- 3단계 결과 출력 세션 ---
+    # --- 결과 출력 ---
     st.header(f"🏁 3단계: [{setup_year_num}년차 ({start_date.year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황 (해당 연차 전용)"])
     target_res = yearly_records[setup_year_num - 1]
