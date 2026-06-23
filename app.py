@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.1", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.3", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,8 +11,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.1")
-st.caption("v6.8.1 수정사항: 자산 설정 및 이자 연산 시스템에 [남편 정기예금] 항목 신설 및 건보료 검증 연동")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.3")
+st.caption("v6.8.3 수정사항: 3단계 리포트 내에 [부부 합산 세후 이자 산출 명세서 및 계산식] 직관적 시각화")
 st.markdown("---")
 
 # 기본 설정 및 기간 입력 (사이드바 상단)
@@ -31,7 +31,7 @@ setup_year_num = int(selected_setup_year.replace("년차", ""))
 if "asset_config" not in st.session_state:
     st.session_state.asset_config = {}
 
-# KeyError 방지 — 모든 연차 기본값 사전 확보 (남편 정기예금 h_deposit 추가)
+# KeyError 방지 — 모든 연차 기본값 사전 확보
 for y in range(1, years_to_run + 1):
     if y == 1:
         st.session_state.asset_config.setdefault(y, {"h_jesus": 110000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 42000, "w_cma": 1200, "w_new_deposit": 0, "override": True})
@@ -71,6 +71,7 @@ with c_vars:
     st.subheader("💰 시장 적용 금리")
     deposit_rate = st.slider("저축은행 정기예금 금리 (%)", 1.0, 6.0, 4.0, 0.1) / 100
     cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, 3.0, 0.1) / 100
+    jesus_rate = st.slider("증권사 주식 예수금 이율 (%)", 0.1, 3.0, 0.6, 0.1) / 100
 
 st.markdown("---")
 
@@ -85,7 +86,6 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
     carry_w_cma = 0
     h_tr_etf = 0
 
-    jesus_rate = 0.006
     tax_rate = 0.154
     monthly_living_cost = living_cost_annual / 12
     monthly_tr_transfer = 1100000000 / 24
@@ -140,7 +140,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
                     "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_deposit + h_cma + max(0, w_deposit + w_new_deposit) + max(0, w_cma)) / 10000)
                 })
 
-        # 이자 산출 (남편 정기예금 이자 연동 반영)
+        # 이자 산출
         avg_h_jesus = sum(h_jesus_monthly_balances) / 12
         h_jesus_interest   = avg_h_jesus * jesus_rate
         h_dep_interest_val = h_deposit * deposit_rate
@@ -189,6 +189,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             "아내기존예금이차": w_old_dep_interest,
             "아내신규예금이차": w_new_dep_interest,
             "아내CMA이자": w_cma_interest_val,
+            "부부세전합계": h_interest_pre + w_interest_pre,
             "세후이자": total_income_post,
             "부족분": deficit,
             "잔돈": leftover
@@ -207,7 +208,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             st.markdown("#### 👨 남편 명의 이자 명세서")
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             st.markdown(f"""
-            * **주식 예수금 이용료 (월할 변동 평균 반영):** {int(target_res['남편예수금이차']/10000):,} 만원
+            * **주식 예수금 이용료 (월할 반영):** {int(target_res['남편예수금이차']/10000):,} 만원
             * **정기예금 이자:** {int(target_res['남편정기예금이자']/10000):,} 만원
             * **대신증권 CMA 이자:** {int(target_res['남편CMA이자']/10000):,} 만원
             """)
@@ -230,6 +231,23 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
                 st.success(f"🛡️ 종합과세 안전지대 (마지노선까지 {int(w_margin/10000):,}만원 여유)")
             else:
                 st.error(f"🚨 경고: 2,000만원 초과! 종합과세 대상")
+
+        # [★핵심 변경★] 부부 합산 세후 이자 도출 과정을 완전 영수증식 명세서로 표기
+        st.markdown("---")
+        st.subheader("🧾 부부 합산 세후 이자 산출 명세서")
+        
+        calc_formula = f"**계산 공식:** (👨 남편 세전 금융소득 + 👩 아내 세전 금융소득) × (1 - 이자소득세율 15.4%) = 👪 부부 합산 찐 세후 이자"
+        st.markdown(calc_formula)
+        
+        # 영수증 디자인 테이블 구성
+        receipt_df = pd.DataFrame([
+            {"항목 명세": "👨 남편 명의 세전 금융소득 합계", "금액": f"{int(target_res['남편세전']/10000):,} 만원"},
+            {"항목 명세": "👩 아내 명의 세전 금융소득 합계", "금액": f"{int(target_res['아내세전']/10000):,} 만원"},
+            {"항목 명세": "📊 부부 세전 소득 합계 (A)", "금액": f"{int(target_res['부부세전합계']/10000):,} 만원"},
+            {"항목 명세": "💸 이자소득세 원천징수 (A × 15.4%)", "금액": f"- {int((target_res['부부세전합계']*0.154)/10000):,} 만원"},
+            {"항목 명세": "👪 부부 최종 세후 이자 수령액", "금액": f"{int(target_res['세후이자']/10000):,} 만원"}
+        ])
+        st.table(receipt_df)
 
         st.markdown("---")
         col_tot1, col_tot2, col_tot3 = st.columns(3)
