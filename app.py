@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.1", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,8 +11,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8")
-st.caption("v6.8 수정사항: TR ETF 자산 인출 불가(철벽 격리) 및 실제 가용 현금(CMA) 중심 생활비 차감 로직 정밀 반영")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.1")
+st.caption("v6.8.1 수정사항: 자산 설정 및 이자 연산 시스템에 [남편 정기예금] 항목 신설 및 건보료 검증 연동")
 st.markdown("---")
 
 # 기본 설정 및 기간 입력 (사이드바 상단)
@@ -31,14 +31,14 @@ setup_year_num = int(selected_setup_year.replace("년차", ""))
 if "asset_config" not in st.session_state:
     st.session_state.asset_config = {}
 
-# KeyError 방지 — 모든 연차 기본값 사전 확보
+# KeyError 방지 — 모든 연차 기본값 사전 확보 (남편 정기예금 h_deposit 추가)
 for y in range(1, years_to_run + 1):
     if y == 1:
-        st.session_state.asset_config.setdefault(y, {"h_jesus": 110000, "h_cma": 1350, "w_deposit": 42000, "w_cma": 1200, "w_new_deposit": 0, "override": True})
+        st.session_state.asset_config.setdefault(y, {"h_jesus": 110000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 42000, "w_cma": 1200, "w_new_deposit": 0, "override": True})
     elif y == 2:
-        st.session_state.asset_config.setdefault(y, {"h_jesus": 55000, "h_cma": 1350, "w_deposit": 36500, "w_cma": 4000, "w_new_deposit": 8000, "override": True})
+        st.session_state.asset_config.setdefault(y, {"h_jesus": 55000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 36500, "w_cma": 4000, "w_new_deposit": 8000, "override": True})
     else:
-        st.session_state.asset_config.setdefault(y, {"h_jesus": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "w_new_deposit": 0, "override": False})
+        st.session_state.asset_config.setdefault(y, {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "w_new_deposit": 0, "override": False})
 
 st.sidebar.subheader(f"📍 [{selected_setup_year}] 초기 자산 배정")
 
@@ -48,13 +48,14 @@ override_flag = st.sidebar.checkbox(
 )
 
 c_hj = st.sidebar.number_input(f"👨 {selected_setup_year} 남편 주식 예수금 (만원)", value=st.session_state.asset_config[setup_year_num]["h_jesus"], step=1000, disabled=not override_flag)
+c_hd = st.sidebar.number_input(f"👨 {selected_setup_year} 남편 정기예금 (만원)", value=st.session_state.asset_config[setup_year_num].get("h_deposit", 0), step=500, disabled=not override_flag)
 c_hc = st.sidebar.number_input(f"👨 {selected_setup_year} 남편 CMA 잔액 (만원)", value=st.session_state.asset_config[setup_year_num]["h_cma"], step=50, disabled=not override_flag)
 c_wd = st.sidebar.number_input(f"👩 {selected_setup_year} 아내 기존정기예금 (만원)", value=st.session_state.asset_config[setup_year_num]["w_deposit"], step=500, disabled=not override_flag)
 c_wn = st.sidebar.number_input(f"👩 {selected_setup_year} 아내 신규정기예금 (만원)", value=st.session_state.asset_config[setup_year_num]["w_new_deposit"], step=500, disabled=not override_flag)
 c_wc = st.sidebar.number_input(f"👩 {selected_setup_year} 아내 CMA 잔액 (만원)", value=st.session_state.asset_config[setup_year_num]["w_cma"], step=50, disabled=not override_flag)
 
 st.session_state.asset_config[setup_year_num] = {
-    "h_jesus": c_hj, "h_cma": c_hc, "w_deposit": c_wd, "w_new_deposit": c_wn, "w_cma": c_wc,
+    "h_jesus": c_hj, "h_deposit": c_hd, "h_cma": c_hc, "w_deposit": c_wd, "w_new_deposit": c_wn, "w_cma": c_wc,
     "override": override_flag
 }
 
@@ -77,6 +78,7 @@ setup_year_num = int(selected_setup_year.replace("년차", ""))
 
 if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동", type="primary"):
     carry_h_jesus = 0
+    carry_h_deposit = 0
     carry_h_cma = 0
     carry_w_deposit = 0
     carry_w_new_deposit = 0
@@ -94,12 +96,13 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
     for year in range(1, years_to_run + 1):
         cfg = st.session_state.asset_config.get(
             year,
-            {"h_jesus": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "w_new_deposit": 0, "override": False}
+            {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "w_new_deposit": 0, "override": False}
         )
 
         use_override = (year == 1) or cfg.get("override", False)
 
         h_jesus      = cfg["h_jesus"] * 10000       if use_override else carry_h_jesus
+        h_deposit    = cfg.get("h_deposit", 0) * 10000 if use_override else carry_h_deposit
         h_cma        = cfg["h_cma"] * 10000         if use_override else carry_h_cma
         w_deposit    = cfg["w_deposit"] * 10000     if use_override else carry_w_deposit
         w_new_deposit= cfg["w_new_deposit"] * 10000 if use_override else carry_w_new_deposit
@@ -111,7 +114,6 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         for month in range(1, 13):
             h_jesus_monthly_balances.append(h_jesus)
 
-            # 1~2년차 예수금 -> TR ETF 월별 분할 이동
             if year <= 2:
                 if h_jesus >= monthly_tr_transfer:
                     h_jesus -= monthly_tr_transfer
@@ -120,11 +122,9 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
                     h_tr_etf += h_jesus
                     h_jesus = 0
 
-            # [★핵심 변경★] 진짜 꺼내 쓸 수 있는 가용 현금 주머니에서만 차감
             if w_cma >= monthly_living_cost:
-                w_cma -= monthly_living_cost  # 5년차까지는 아내 CMA 지갑에서 차감
+                w_cma -= monthly_living_cost
             else:
-                # 아내 돈이 바닥나면 '인출 불가능한 TR ETF'는 건드리지 않고 오직 '남편 CMA'에서만 차감!
                 h_cma -= monthly_living_cost
 
             if year == setup_year_num:
@@ -132,19 +132,20 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
                     "연차": f"{year}년차",
                     "월": f"{month}월",
                     "👨남편 주식예수금": int(h_jesus / 10000),
+                    "👨남편 정기예금": int(h_deposit / 10000),
                     "👨남편 CMA잔액(가용현금)": int(h_cma / 10000),
                     "👨남편 지수TR ETF(잠금)": int(h_tr_etf / 10000),
                     "👩아내 정기예금": int(max(0, (w_deposit + w_new_deposit)) / 10000),
                     "👩아내 CMA": int(max(0, w_cma) / 10000),
-                    "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_cma + max(0, w_deposit + w_new_deposit) + max(0, w_cma)) / 10000)
+                    "👪부부 찐 가용자산(CMA+예금)": int((h_jesus + h_deposit + h_cma + max(0, w_deposit + w_new_deposit) + max(0, w_cma)) / 10000)
                 })
 
-        # 이자 산출
+        # 이자 산출 (남편 정기예금 이자 연동 반영)
         avg_h_jesus = sum(h_jesus_monthly_balances) / 12
-        h_jesus_interest = avg_h_jesus * jesus_rate
-        
+        h_jesus_interest   = avg_h_jesus * jesus_rate
+        h_dep_interest_val = h_deposit * deposit_rate
         h_cma_interest     = h_cma * cma_rate
-        h_interest_pre     = h_jesus_interest + h_cma_interest
+        h_interest_pre     = h_jesus_interest + h_dep_interest_val + h_cma_interest
 
         w_old_dep_interest = w_deposit * deposit_rate
         w_new_dep_interest = w_new_deposit * deposit_rate
@@ -155,13 +156,11 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         w_interest_post    = int(w_interest_pre * (1 - tax_rate))
         total_income_post  = h_interest_post + w_interest_post
 
-        # 세후 이자 입금 처리
         if year <= 5:
             w_cma += total_income_post
         else:
             h_cma += total_income_post
 
-        # TR ETF는 내부적으로만 복리로 우상향 (생활비 방어에 기여 안 함)
         h_tr_etf = int(h_tr_etf * (1 + tr_etf_rate))
 
         deficit  = int(living_cost_annual - total_income_post)
@@ -174,6 +173,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
 
         # 이월 데이터 상속
         carry_h_jesus      = h_jesus
+        carry_h_deposit    = h_deposit
         carry_h_cma        = h_cma
         carry_w_deposit    = w_deposit
         carry_w_new_deposit= w_new_deposit
@@ -183,6 +183,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             "연차": f"{year}년차",
             "남편세전": h_interest_pre,
             "남편예수금이차": h_jesus_interest,
+            "남편정기예금이자": h_dep_interest_val,
             "남편CMA이자": h_cma_interest,
             "아내세전": w_interest_pre,
             "아내기존예금이차": w_old_dep_interest,
@@ -207,6 +208,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             st.markdown(f"""
             * **주식 예수금 이용료 (월할 변동 평균 반영):** {int(target_res['남편예수금이차']/10000):,} 만원
+            * **정기예금 이자:** {int(target_res['남편정기예금이자']/10000):,} 만원
             * **대신증권 CMA 이자:** {int(target_res['남편CMA이자']/10000):,} 만원
             """)
             h_margin = 10000000 - target_res['남편세전']
@@ -245,6 +247,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         st.dataframe(
             df_monthly.style.format({
                 "👨남편 주식예수금": "{:,} 만원",
+                "👨남편 정기예금": "{:,} 만원",
                 "👨남편 CMA잔액(가용현금)": "{:,} 만원",
                 "👨남편 지수TR ETF(잠금)": "{:,} 만원",
                 "👩아내 정기예금": "{:,} 만원",
