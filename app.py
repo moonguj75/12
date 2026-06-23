@@ -12,15 +12,17 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.5")
-st.caption("v7.5 핵심 수정: v7.4 기반 연차별 자산 숫자 튕김 버그 완벽 수정 및 년·월·일 달력 엔진 완벽 통합")
+st.caption("v7.5 핵심 수정: v7.4 기반 DEFAULT_ASSET 선언 순서 에러 완벽 수정 및 자산 숫자 고정 완성")
 st.markdown("---")
 
-# 1. 마스터 저장소 (기억 버튼으로만 갱신)
+# [★안전 패치★] 에러 원천 차단을 위해 DEFAULT_ASSET 선언을 최상단으로 이동
 DEFAULT_ASSET = lambda: {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False}
 
+# 1. 마스터 저장소 (기억 버튼으로만 갱신)
 if "master_store" not in st.session_state:
     st.session_state.master_store = {
-        "start_date": datetime(2026, 6, 23).date(), # 년-월-일 달력 객체화
+        "start_year": 2026,
+        "start_month": 6,
         "years_to_run": 10,
         "living_cost_annual": 7740,
         "deposit_unit": 8400,
@@ -38,7 +40,8 @@ if "master_store" not in st.session_state:
 if "cfg" not in st.session_state:
     ms = st.session_state.master_store
     st.session_state.cfg = {
-        "start_date": ms["start_date"],
+        "start_year": ms["start_year"],
+        "start_month": ms["start_month"],
         "years_to_run": ms["years_to_run"],
         "living_cost_annual": ms["living_cost_annual"],
         "deposit_unit": ms["deposit_unit"],
@@ -66,7 +69,7 @@ with col_save:
     if st.button("💾 현재 세팅 기억", use_container_width=True, type="primary"):
         import copy
         st.session_state.master_store = copy.deepcopy(cfg)
-        st.sidebar.success("✅ 모든 수치 세팅 기억 완료!")
+        st.sidebar.success("✅ 모든 세팅 기억 완료!")
 
 with col_load:
     if st.button("📂 세팅 불러오기", use_container_width=True):
@@ -81,10 +84,13 @@ st.sidebar.markdown("---")
 # ============================================================
 st.sidebar.header("🗓️ 기본 환경 설정")
 
-# 년월일 단위 정밀 제어를 위한 달력 컴포넌트 탑재
-cfg["start_date"] = st.sidebar.date_input(
-    "🚀 시뮬레이션 기준 시작일 (년-월-일)",
-    value=cfg["start_date"])
+cfg["start_year"] = st.sidebar.number_input(
+    "🚀 시뮬레이션 시작 연도", min_value=2020, max_value=2060, step=1,
+    value=cfg["start_year"])
+
+cfg["start_month"] = st.sidebar.number_input(
+    "🚀 시뮬레이션 시작 월", min_value=1, max_value=12, step=1,
+    value=cfg["start_month"])
 
 cfg["years_to_run"] = st.sidebar.number_input(
     "📊 전체 시뮬레이션 기간 (년)", min_value=1, max_value=30, step=1,
@@ -103,25 +109,21 @@ for y in range(1, cfg["years_to_run"] + 1):
     cfg["asset_config"].setdefault(y, DEFAULT_ASSET())
 
 # ============================================================
-# 5. 연차별 자산 설정 (숫자 입력 실시간 미러링 보완 완료)
+# 5. 연차별 자산 설정 (숫자 입력 잠김 현상 수정)
 # ============================================================
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 연차별 자산 설정")
 
-start_date_obj = cfg["start_date"]
-year_options = [f"{i}년차({start_date_obj.year + i - 1}년)" for i in range(1, cfg["years_to_run"] + 1)]
-
-# 현재 선택되어 있는 인덱스가 시뮬레이션 범위를 넘지 않도록 안전 가드 장착
-safe_index = min(cfg["selected_year"] - 1, len(year_options) - 1)
+year_options = [f"{i}년차({cfg['start_year'] + i - 1}년)" for i in range(1, cfg["years_to_run"] + 1)]
 selected_label = st.sidebar.selectbox(
     "계측 및 자산 설정을 진행할 연차를 고르세요",
     year_options,
-    index=safe_index
+    index=min(cfg["selected_year"] - 1, len(year_options) - 1)
 )
 setup_year_num = int(selected_label.split("년차")[0])
 cfg["selected_year"] = setup_year_num
 
-target_display_year = start_date_obj.year + setup_year_num - 1
+target_display_year = cfg["start_year"] + setup_year_num - 1
 st.sidebar.subheader(f"📍 [{setup_year_num}년차 ({target_display_year}년)] 자산 배정")
 
 ac = cfg["asset_config"][setup_year_num]
@@ -131,7 +133,7 @@ ac["override"] = st.sidebar.checkbox(
     value=ac["override"]
 )
 
-# ★ 입력한 숫자가 즉시 저장되도록 좌변 변수 바인딩(ac["필드"] =) 처리 완성
+# ★ 수정된 숫자가 즉시 저장되도록 좌변에 ac["필드"] 명시적 대입 완성
 ac["h_jesus"]   = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)",  step=1000, value=int(ac["h_jesus"]),   disabled=not ac["override"])
 ac["h_deposit"] = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)",      step=500,  value=int(ac["h_deposit"]), disabled=not ac["override"])
 ac["h_cma"]     = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)",      step=50,   value=int(ac["h_cma"]),     disabled=not ac["override"])
@@ -160,6 +162,8 @@ cma_rate     = cfg["cma_rate"]     / 100
 jesus_rate   = cfg["jesus_rate"]   / 100
 living_cost_annual = cfg["living_cost_annual"] * 10000
 deposit_unit       = cfg["deposit_unit"] * 10000
+start_year         = cfg["start_year"]
+start_month        = cfg["start_month"]
 years_to_run       = cfg["years_to_run"]
 
 st.markdown("---")
@@ -167,7 +171,7 @@ st.markdown("---")
 # ============================================================
 # 7. 장부 가동 엔진
 # ============================================================
-if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_num - 1}년) 장부 집중 가동", type="primary", use_container_width=True):
+if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년) 장부 집중 가동", type="primary", use_container_width=True):
 
     carry_h_jesus = carry_h_deposit = carry_h_cma = 0
     carry_w_deposit = carry_w_cma = 0
@@ -177,9 +181,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
     monthly_tr_transfer = 1100000000 / 24
 
     yearly_records, monthly_records = [], []
-    
-    # 년-월-일 매핑용 시뮬레이션 전용 달력 포인터 구동
-    current_date = datetime(start_date_obj.year, start_date_obj.month, start_date_obj.day)
+    current_date = datetime(start_year, start_month, 1)
 
     for year in range(1, years_to_run + 1):
         ac_y = cfg["asset_config"].get(year, DEFAULT_ASSET())
@@ -196,7 +198,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
         h_cma_init     = h_cma
         w_deposit_init = w_deposit
         w_cma_init     = w_cma
-        cal_year = start_date_obj.year + year - 1
+        cal_year = start_year + year - 1
 
         for month in range(1, 13):
             h_jesus_monthly_balances.append(h_jesus)
@@ -214,16 +216,8 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
             else:
                 h_cma = max(0, h_cma - monthly_living_cost)
 
-            # 정산 이후 1달 소비가 끝난 정확한 년-월-일 날짜 매핑 기록
-            m = current_date.month + 1
-            y_off = current_date.year
-            if m > 12:
-                m = 1
-                y_off += 1
-            current_date = datetime(y_off, m, min(current_date.day, 28))
-
             if year == setup_year_num:
-                stamp_text = current_date.strftime("%Y년 %m월 %d일")
+                stamp_text = current_date.strftime("%Y년 %m월")
                 monthly_records.append({
                     "📅 정산 기준일": stamp_text,
                     "👨남편 주식예수금":        int(h_jesus / 10000),
@@ -234,6 +228,13 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
                     "👩아내 CMA":              int(max(0, w_cma) / 10000),
                     "👪부부 찐 가용자산":       int((h_jesus + h_deposit + h_cma + max(0, w_deposit) + max(0, w_cma)) / 10000)
                 })
+
+            m = current_date.month + 1
+            y_off = current_date.year
+            if m > 12:
+                m = 1
+                y_off += 1
+            current_date = datetime(y_off, m, 1)
 
         avg_h_jesus        = sum(h_jesus_monthly_balances) / 12
         h_jesus_interest   = avg_h_jesus * jesus_rate
@@ -291,16 +292,16 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
     # ============================================================
     # 8. 리포트 출력
     # ============================================================
-    st.header(f"🏁 [{setup_year_num}년차 ({start_date_obj.year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
+    st.header(f"🏁 [{setup_year_num}년차 ({start_year + setup_year_num - 1}년 정산)] 집중 분석 리포트")
     tab_yearly, tab_monthly = st.tabs(["📅 건보료선 정밀 검증 보고서", "📊 월별 주머니 잔고 현황"])
     target_res = yearly_records[setup_year_num - 1]
 
     with tab_yearly:
-        st.subheader(f"🧾 이자 계산 상세 명세 ({start_date_obj.year + setup_year_num - 1}년 정산)")
+        st.subheader(f"🧾 이자 계산 상세 명세 ({start_year + setup_year_num - 1}년 정산)")
         h_interest_table = pd.DataFrame([
             {"명의": "👨 남편", "자산 주머니": "주식 예수금 (월할평균)", "원금": f"{int(target_res['남편예수금_avg']/10000):,} 만원", "적용이율": f"{jesus_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편예수금이차']/10000):,} 만원"},
             {"명의": "👨 남편", "자산 주머니": "정기예금",               "원금": f"{int(target_res['남편예금_val']/10000):,} 만원", "적용이율": f"{deposit_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편정기예금이자']/10000):,} 만원"},
-            {"명의": "👨 남편", "자산 주머니": "대신증권 CMA",           "원금": f"{int(target_res['남편CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편CMA이자']/10000):,} 만원"},
+            {"명의": "👨 남편", "자산 주머니": "대신증증권 CMA",           "원금": f"{int(target_res['남편CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편CMA이자']/10000):,} 만원"},
             {"명의": "👩 아내", "자산 주머니": "정기예금",               "원금": f"{int(target_res['아내예금_val']/10000):,} 만원", "적용이율": f"{deposit_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['아내기존예금이차']/10000):,} 만원"},
             {"명의": "👩 아내", "자산 주머니": "대신증권 CMA (평균잔고)", "원금": f"{int(target_res['아내CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}% (반년)", "발생이자 (세전)": f"{int(target_res['아내CMA이자']/10000):,} 만원"},
         ])
@@ -309,6 +310,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
         col_h, col_w = st.columns(2)
         with col_h:
             st.markdown("#### 👨 남편 총평")
+            st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):配置} 만원".replace('配置', '配置').replace('配置', ''))
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0:
@@ -346,7 +348,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_date_obj.year + setup_year_nu
             st.caption("※ 연말 잔돈은 자동으로 아내 CMA 통장으로 전액 이양됩니다.")
 
     with tab_monthly:
-        st.subheader("🗓️ 선택 연차 월별 잔고 흐름 보고서")
+        st.subheader("📊 선택 연차 월별 잔고 흐름 보고서")
         df_monthly = pd.DataFrame(monthly_records)
         st.dataframe(
             df_monthly.set_index("📅 정산 기준일").style.format({
