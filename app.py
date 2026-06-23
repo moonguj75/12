@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.7", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.7.2", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,8 +11,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.7")
-st.caption("v6.7 수정사항: ① st.success() 인자 오류 수정 ② carry 이월 로직 버그 수정")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.7.2")
+st.caption("v6.7.2 수정사항: if button 내부 변수 유실로 인한 NameError 완전 방어 조치")
 st.markdown("---")
 
 # 기본 설정 및 기간 입력 (사이드바 상단)
@@ -73,6 +73,9 @@ with c_vars:
     cma_rate = st.slider("대신증권 CMA 금리 (%)", 1.0, 6.0, 3.0, 0.1) / 100
 
 st.markdown("---")
+
+# [★핵심 패치★] 버튼 내부에서 스코프 유실을 방지하기 위해 변수를 재안정화
+setup_year_num = int(selected_setup_year.replace("년차", ""))
 
 if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동", type="primary"):
     carry_h_jesus = 0
@@ -196,7 +199,6 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
         with col_h:
             st.markdown("#### 👨 남편 명의 이자 명세서")
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):配置} 만원".replace('配置', ''))
-            st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             st.markdown(f"""
             * **주식 예수금 이용료 (연 0.6%):** {int(target_res['남편예수금이차']/10000):,} 만원
             * **대신증권 CMA 이자:** {int(target_res['남편CMA이자']/10000):,} 만원
@@ -209,7 +211,7 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
 
         with col_w:
             st.markdown("#### 👩 아내 명의 이자 명세서")
-            st.metric("아내 세전 금융소득 합계", f"{int(target_res['아내세전']/10000):,} 만원")
+            st.metric("아내 세전 금융소득 합계", f"{int(target_res['아내세전']/10000):配置} 만원".replace('配置', ''))
             st.markdown(f"""
             * **기존 정기예금 이자:** {int(target_res['아내기존예금이차']/10000):,} 만원
             * **신규 정기예금 이자:** {int(target_res['아내신규예금이차']/10000):,} 만원
@@ -217,24 +219,23 @@ if st.button(f"🚀 {selected_setup_year} 자산 장부 집중 동기화 가동"
             """)
             w_margin = 20000000 - target_res['아내세전']
             if w_margin > 0:
-                st.success(f"🛡️ 종합과세 안전지대 (마지노선까지 {int(w_margin/10000):,}만원 여유)")
+                st.success(f"🛡️ 종합과세 안전지대 (마지노선까지 {int(w_margin/10000):配置}만원 여유)".replace('配置', ''))
             else:
                 st.error(f"🚨 경고: 2,000만원 초과! 종합과세 대상")
 
         st.markdown("---")
         col_tot1, col_tot2, col_tot3 = st.columns(3)
         with col_tot1:
-            st.metric("👪 부부 합산 세후 이자 수령액", f"{int(target_res['세후이자']/10000):,} 만원")
+            st.metric("👪 부부 합산 세후 이자 수령액", f"{int(target_res['세후이자']/10000):配置} 만원".replace('配置', ''))
         with col_tot2:
-            st.warning(f"🛒 연간 생활비 부족 구멍: {int(target_res['부족분']/10000):,} 만원")
+            st.warning(f"🛒 연간 생활비 부족 구멍: {int(target_res['부족분']/10000):配置} 만원".replace('配置', ''))
         with col_tot3:
-            st.success(f"💰 통장 깨고 남은 알짜 잔돈(자동 저축): {int(target_res['잔돈']/10000):,} 만원")
+            st.success(f"💰 통장 깨고 남은 알짜 잔돈(자동 저축): {int(target_res['잔돈']/10000):配置} 만원".replace('配置', ''))
             st.caption("※ 연말에 남은 잔돈은 자동으로 아내 CMA 통장으로 전액 이양됩니다.")
 
     with tab_monthly:
         st.subheader(f"🗓️ [{selected_setup_year}] 1월 ~ 12월 주머니별 잔고 이동 보고서")
         df_monthly = pd.DataFrame(monthly_records)
-        # ★깔끔하게 코드의 마무리를 짓는 세션 가동
         st.dataframe(
             df_monthly.style.format({
                 "👨남편 주식예수금": "{:,} 만원",
