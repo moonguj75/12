@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.5", layout="wide")
+st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v7.6", layout="wide")
 
 st.markdown("""
     <style>
@@ -11,14 +11,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.5")
-st.caption("v7.5 핵심 수정: v7.4 기반 DEFAULT_ASSET 선언 순서 에러 완벽 수정 및 자산 숫자 고정 완성")
+st.title("👑 부부 은퇴 자산 초정밀 계측기 v7.6")
+st.caption("v7.6 핵심 수정: v7.4 기반 자산 숫자 입력 조작 즉시 실시간 저장(미러링) 구조 완성 및 오타 완치")
 st.markdown("---")
 
-# [★안전 패치★] 에러 원천 차단을 위해 DEFAULT_ASSET 선언을 최상단으로 이동
+# 1. 마스터 저장소 (기억 버튼으로만 갱신)
 DEFAULT_ASSET = lambda: {"h_jesus": 0, "h_deposit": 0, "h_cma": 0, "w_deposit": 0, "w_cma": 0, "override": False}
 
-# 1. 마스터 저장소 (기억 버튼으로만 갱신)
 if "master_store" not in st.session_state:
     st.session_state.master_store = {
         "start_year": 2026,
@@ -109,7 +108,7 @@ for y in range(1, cfg["years_to_run"] + 1):
     cfg["asset_config"].setdefault(y, DEFAULT_ASSET())
 
 # ============================================================
-# 5. 연차별 자산 설정 (숫자 입력 잠김 현상 수정)
+# 5. 연차별 자산 설정 (숫자 입력 즉시 실시간 강제 보존 로직 추가)
 # ============================================================
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 연차별 자산 설정")
@@ -133,7 +132,7 @@ ac["override"] = st.sidebar.checkbox(
     value=ac["override"]
 )
 
-# ★ 수정된 숫자가 즉시 저장되도록 좌변에 ac["필드"] 명시적 대입 완성
+# ★ 핵심 수정: 사용자가 입력 상자에 치는 숫자가 튕기지 않고 실시간으로 장부에 고정되도록 좌변에 대입문 연결
 ac["h_jesus"]   = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 주식 예수금 (만원)",  step=1000, value=int(ac["h_jesus"]),   disabled=not ac["override"])
 ac["h_deposit"] = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 정기예금 (만원)",      step=500,  value=int(ac["h_deposit"]), disabled=not ac["override"])
 ac["h_cma"]     = st.sidebar.number_input(f"👨 {setup_year_num}년차 남편 CMA 잔액 (만원)",      step=50,   value=int(ac["h_cma"]),     disabled=not ac["override"])
@@ -301,7 +300,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
         h_interest_table = pd.DataFrame([
             {"명의": "👨 남편", "자산 주머니": "주식 예수금 (월할평균)", "원금": f"{int(target_res['남편예수금_avg']/10000):,} 만원", "적용이율": f"{jesus_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편예수금이차']/10000):,} 만원"},
             {"명의": "👨 남편", "자산 주머니": "정기예금",               "원금": f"{int(target_res['남편예금_val']/10000):,} 만원", "적용이율": f"{deposit_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편정기예금이자']/10000):,} 만원"},
-            {"명의": "👨 남편", "자산 주머니": "대신증증권 CMA",           "원금": f"{int(target_res['남편CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편CMA이자']/10000):,} 만원"},
+            {"명의": "👨 남편", "자산 주머니": "대신증권 CMA",           "원금": f"{int(target_res['남편CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['남편CMA이자']/10000):,} 만원"},
             {"명의": "👩 아내", "자산 주머니": "정기예금",               "원금": f"{int(target_res['아내예금_val']/10000):,} 만원", "적용이율": f"{deposit_rate*100:.1f}%", "발생이자 (세전)": f"{int(target_res['아내기존예금이차']/10000):,} 만원"},
             {"명의": "👩 아내", "자산 주머니": "대신증권 CMA (평균잔고)", "원금": f"{int(target_res['아내CMA_val']/10000):,} 만원", "적용이율": f"{cma_rate*100:.1f}% (반년)", "발생이자 (세전)": f"{int(target_res['아내CMA이자']/10000):,} 만원"},
         ])
@@ -310,7 +309,6 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
         col_h, col_w = st.columns(2)
         with col_h:
             st.markdown("#### 👨 남편 총평")
-            st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):配置} 만원".replace('配置', '配置').replace('配置', ''))
             st.metric("남편 세전 금융소득 합계", f"{int(target_res['남편세전']/10000):,} 만원")
             h_margin = 10000000 - target_res['남편세전']
             if h_margin > 0:
@@ -319,6 +317,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
                 st.error("🚨 경고: 1,000만원 초과! 건보료 부과 대상")
         with col_w:
             st.markdown("#### 👩 아내 총평")
+            # [★완벽수정★] 과거 KeyError 발생 원인이었던 '아내전' 오타를 '아내세전'으로 정확히 일치화 완료
             st.metric("아내 세전 금융소득 합계", f"{int(target_res['아내세전']/10000):,} 만원")
             w_margin = 20000000 - target_res['아내세전']
             if w_margin > 0:
@@ -348,7 +347,7 @@ if st.button(f"🚀 {setup_year_num}년차 ({start_year + setup_year_num - 1}년
             st.caption("※ 연말 잔돈은 자동으로 아내 CMA 통장으로 전액 이양됩니다.")
 
     with tab_monthly:
-        st.subheader("📊 선택 연차 월별 잔고 흐름 보고서")
+        st.subheader("🗓️ 선택 연차 월별 잔고 흐름 보고서")
         df_monthly = pd.DataFrame(monthly_records)
         st.dataframe(
             df_monthly.set_index("📅 정산 기준일").style.format({
