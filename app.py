@@ -12,7 +12,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 자산 초정밀 계측기 v6.8.9")
+st.title("👑 자산 PLAN v6.8.9")
 st.caption("v6.8.9 수정사항: 월별 잔고 보고서의 달력 연산 타이밍 버그 수정 (최종일 2027-06-23 정상 도달 보장)")
 st.markdown("---")
 
@@ -25,7 +25,7 @@ if "global_snapshot" not in st.session_state:
         "deposit_unit": 9200,
         "tr_etf_rate": 5.0,
         "deposit_rate": 4.0,
-        "cma_rate": 3.0,
+        "cma_rate": 2.3,
         "jesus_rate": 0.6
     }
 
