@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="부부 은퇴 자산 입체 계측기 v6.8.9", layout="wide")
+st.set_page_config(page_title="은퇴 자산 입체 계측기 v6.8.9", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,7 +12,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("👑 부부 은퇴 자산 초정밀 계측기 v6.8.9")
+st.title("👑 은퇴 자산 초정밀 계측기 v6.8.9")
 st.caption("v6.8.9 수정사항: 월별 잔고 보고서의 달력 연산 타이밍 버그 수정 (최종일 2027-06-23 정상 도달 보장)")
 st.markdown("---")
 
