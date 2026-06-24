@@ -19,7 +19,7 @@ st.markdown("---")
 # 세션 스냅샷 초기화
 if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
-        "start_date": datetime(2026, 6, 23).date(),
+        "start_date": datetime(2026, 6, 24).date(),
         "years_to_run": 11,
         "living_cost_annual": 7600,
         "deposit_unit": 9200,
