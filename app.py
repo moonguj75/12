@@ -21,7 +21,7 @@ if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
         "start_date": datetime(2026, 6, 23).date(),
         "years_to_run": 10,
-        "living_cost_annual": 7740,
+        "living_cost_annual": 7600,
         "deposit_unit": 8400,
         "tr_etf_rate": 5.0,
         "deposit_rate": 4.0,
