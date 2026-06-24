@@ -20,9 +20,9 @@ st.markdown("---")
 if "global_snapshot" not in st.session_state:
     st.session_state.global_snapshot = {
         "start_date": datetime(2026, 6, 23).date(),
-        "years_to_run": 10,
+        "years_to_run": 11,
         "living_cost_annual": 7600,
-        "deposit_unit": 8400,
+        "deposit_unit": 9200,
         "tr_etf_rate": 5.0,
         "deposit_rate": 4.0,
         "cma_rate": 3.0,
@@ -44,7 +44,7 @@ if "asset_config" not in st.session_state:
 
 for y in range(1, years_to_run + 1):
     if y == 1:
-        st.session_state.asset_config.setdefault(y, {"h_jesus": 110000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 42000, "w_cma": 1200, "override": True})
+        st.session_state.asset_config.setdefault(y, {"h_jesus": 113500, "h_deposit": 10000, "h_cma": 0, "w_deposit": 46000, "w_cma": 8000, "override": True})
     elif y == 2:
         st.session_state.asset_config.setdefault(y, {"h_jesus": 55000, "h_deposit": 0, "h_cma": 1350, "w_deposit": 36500, "w_cma": 4000, "override": True})
     else:
